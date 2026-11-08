@@ -1,0 +1,74 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore TwitchWoWOverlay.csproj
+
+      - name: Publish Release Build
+        run: |
+          dotnet publish TwitchWoWOverlay.csproj -c Release -r win-x64 --self-contained false -o ./publish
+
+      - name: Copy Launcher Script
+        shell: pwsh
+        run: |
+          Copy-Item "Start-Overlay.bat" -Destination "./publish/Start-Overlay.bat"
+
+      - name: Package Release Zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path ./publish/* -DestinationPath ./WoW-Twitch-Overlay-win-x64.zip
+
+      - name: Determine Release Tag
+        id: get_tag
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+          } elseif ("${{ inputs.tag_name }}" -ne "") {
+            $tag = "${{ inputs.tag_name }}"
+          } else {
+            $tag = "v1.0.0"
+          }
+          Write-Output "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          name: "WoW Twitch Overlay ${{ steps.get_tag.outputs.tag }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            ./WoW-Twitch-Overlay-win-x64.zip
+            ./publish/TwitchWoWOverlay.exe

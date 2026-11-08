@@ -1,0 +1,18 @@
+# Build results
+bin/
+obj/
+dist/
+publish/
+
+# Visual Studio / IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.suo
+
+# WebView2 Runtime User Data
+WebView2Data/
+*.tmp
+*.log
